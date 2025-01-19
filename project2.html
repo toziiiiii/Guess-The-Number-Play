@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guess the Number Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #1d1d1d;
+            overflow: hidden;
+            position: relative;
+        }
+        #game-container {
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            width: 300px;
+            text-align: center;
+            z-index: 1;
+        }
+        input[type="number"] {
+            padding: 10px;
+            width: 80%;
+            margin-bottom: 10px;
+            font-size: 16px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            border-radius: 5px;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        .message {
+            margin-top: 10px;
+        }
+        .message.winner {
+            color: gold;
+            font-size: 1.5em;
+            animation: confetti 1s forwards;
+        }
+        .message.game-over {
+            color: red;
+            font-size: 1.2em;
+        }
+        .message.hint {
+            color: lightblue;
+            font-size: 1.1em;
+        }
+        /* Animation for confetti effect (celebration) */
+        @keyframes confetti {
+            0% { opacity: 0; transform: translateY(0); }
+            100% { opacity: 1; transform: translateY(200px); }
+        }
+
+        /* Floating math symbols */
+        .math-symbol {
+            position: absolute;
+            color: white;
+            font-size: 30px;
+            animation: float 5s infinite linear;
+        }
+        @keyframes float {
+            0% {
+                transform: translateY(0) rotate(0deg);
+            }
+            100% {
+                transform: translateY(-500px) rotate(360deg);
+            }
+        }
+
+        /* Watermark for creator credit */
+        .watermark {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-style: italic;
+            font-size: 18px;
+            color: rgba(255, 255, 255, 0.5);
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        /* Leaderboard */
+        #leaderboard {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            color: white;
+            border-radius: 8px;
+            display: none;
+            z-index: 5;
+        }
+        #leaderboard h3 {
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <h1>Guess the Number Game</h1>
+        <p>I'm thinking of a number between 1 and <span id="max-number">100</span>. You have <span id="attempts-left">10</span> attempts to guess it!</p>
+        <input type="number" id="user-guess" placeholder="Enter your guess" min="1" max="100">
+        <button id="submit-guess">Submit Guess</button>
+        <button id="replay-btn" style="display: none;">Replay</button>
+        <div class="message" id="message"></div>
+        <div class="message" id="hint"></div>
+    </div>
+
+    <div id="leaderboard">
+        <h3>Leaderboard</h3>
+        <div id="leaderboard-list"></div>
+    </div>
+
+    <div class="watermark">Created by Rahul</div>
+
+    <script>
+        let numberToGuess;
+        let maxAttempts = 10;
+        let attempts = 0;
+        let highScore = 0;
+        let streak = 0;
+        let maxNumber = 100;
+        let leaderboard = JSON.parse(localStorage.getItem('leaderboard')) || [];
+
+        const userGuessInput = document.getElementById('user-guess');
+        const submitButton = document.getElementById('submit-guess');
+        const replayButton = document.getElementById('replay-btn');
+        const messageDiv = document.getElementById('message');
+        const hintDiv = document.getElementById('hint');
+        const attemptsLeftDiv = document.getElementById('attempts-left');
+        const maxNumberDiv = document.getElementById('max-number');
+        const leaderboardDiv = document.getElementById('leaderboard');
+        const leaderboardList = document.getElementById('leaderboard-list');
+
+        // Function to start the game
+        function startGame() {
+            numberToGuess = Math.floor(Math.random() * maxNumber) + 1;
+            attempts = 0;
+            updateAttemptsLeft();
+            updateMessage('Guess the number!', '');
+            hintDiv.textContent = '';
+            userGuessInput.disabled = false;
+            submitButton.disabled = false;
+            replayButton.style.display = 'none';
+            userGuessInput.value = '';
+        }
+
+        // Update attempts left
+        function updateAttemptsLeft() {
+            attemptsLeftDiv.textContent = `Attempts left: ${maxAttempts - attempts}`;
+        }
+
+        // Update message content
+        function updateMessage(message, className) {
+            messageDiv.textContent = message;
+            messageDiv.className = `message ${className}`;
+        }
+
+        // Show hint
+        function showHint() {
+            const difference = Math.abs(numberToGuess - parseInt(userGuessInput.value));
+            if (difference > 50) {
+                hintDiv.textContent = 'You are very far from the number!';
+            } else if (difference > 20) {
+                hintDiv.textContent = 'You are getting closer!';
+            } else if (difference > 10) {
+                hintDiv.textContent = 'You are quite close!';
+            } else {
+                hintDiv.textContent = 'Very close, just a bit more!';
+            }
+        }
+
+        // Play sound
+        function playSound(url) {
+            const sound = new Audio(url);
+            sound.play();
+        }
+
+        // Check if the guess is correct
+        submitButton.addEventListener('click', () => {
+            const guess = parseInt(userGuessInput.value);
+
+            if (isNaN(guess)) {
+                updateMessage('Please enter a valid number!', 'error');
+                return;
+            }
+
+            attempts++;
+
+            if (guess === numberToGuess) {
+                streak++;
+                updateMessage(`🎉 Congratulations! You guessed it in ${attempts} attempts!`, 'winner');
+                updateHighScore();
+                increaseDifficulty();
+                playSound('https://www.soundjay.com/button/beep-07.wav');
+                leaderboard.push({score: attempts, streak});
+                leaderboard.sort((a, b) => a.score - b.score);
+                if (leaderboard.length > 5) leaderboard = leaderboard.slice(0, 5);
+                localStorage.setItem('leaderboard', JSON.stringify(leaderboard));
+                showLeaderboard();
+                replayButton.style.display = 'block';
+            } else if (guess < numberToGuess) {
+                updateMessage('Too low! Try again.', 'error');
+                playSound('https://www.soundjay.com/button/beep-07.wav');
+            } else {
+                updateMessage('Too high! Try again.', 'error');
+                playSound('https://www.soundjay.com/button/beep-07.wav');
+            }
+
+            showHint();
+            updateAttemptsLeft();
+
+            if (attempts === maxAttempts) {
+                updateMessage(`Game Over! The correct number was ${numberToGuess}.`, 'game-over');
+                streak = 0;
+                submitButton.disabled = true;
+                userGuessInput.disabled = true;
+                playSound('https://www.soundjay.com/button/beep-07.wav');
+            }
+
+            userGuessInput.value = ''; // Clear input field
+        });
+
+        // Increase difficulty by increasing the number range
+        function increaseDifficulty() {
+            maxNumber += 50;
+            maxNumberDiv.textContent = maxNumber;
+        }
+
+        // Update high score
+        function updateHighScore() {
+            if (attempts < highScore || highScore === 0) {
+                highScore = attempts;
+            }
+        }
+
+        // Replay game
+        replayButton.addEventListener('click', startGame);
+
+        // Show leaderboard
+        function showLeaderboard() {
+            leaderboardDiv.style.display = 'block';
+            leaderboardList.innerHTML = leaderboard.map((entry, index) => 
+                `<p>${index + 1}. Streak: ${entry.streak}, Attempts: ${entry.score}</p>`
+            ).join('');
+        }
+
+        // Start the first game
+        startGame();
+
+    </script>
+
+</body>
+</html>
